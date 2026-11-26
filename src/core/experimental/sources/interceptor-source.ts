@@ -15,6 +15,7 @@ import { InternalError } from '../../utils/internal/dev-utils'
 import { HttpNetworkFrame, ResponseEvent } from '../frames/http-frame'
 import { WebSocketNetworkFrame } from '../frames/websocket-frame'
 import { deleteRequestPassthroughHeader } from '../request-utils'
+import { restoreStrippedRequestHeaders } from '../../utils/request/restore-stripped-request-headers'
 
 export interface InterceptorSourceOptions {
   interceptors: Array<Interceptor<HttpRequestEventMap | WebSocketEventMap>>
@@ -72,6 +73,14 @@ export class InterceptorSource extends NetworkSource {
 
   async #handleRequest(event: HttpRequestEvent): Promise<void> {
     const { requestId, request, controller } = event
+
+    /**
+     * @note Browser-like `Request` constructors strip forbidden headers
+     * such as `Cookie` and `Content-Length`. Put back the values parsed
+     * from the socket before handlers read this request.
+     * @see https://github.com/mswjs/msw/issues/2815
+     */
+    restoreStrippedRequestHeaders(request)
     const httpFrame = new InterceptorHttpNetworkFrame({
       id: requestId,
       request,
